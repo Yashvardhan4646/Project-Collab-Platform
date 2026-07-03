@@ -1,5 +1,5 @@
-import { ChannelSkeleton } from "@/components/skeletons";
+import { DeskLoader } from "@/components/desk-loader";
 
 export default function Loading() {
-  return <ChannelSkeleton />;
+  return <DeskLoader />;
 }
