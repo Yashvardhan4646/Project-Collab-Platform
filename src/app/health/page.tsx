@@ -17,14 +17,19 @@ export default async function HealthPage() {
     try {
       const supabase = await createClient()
       // No tables exist yet (the schema is added later). We ping PostgREST
-      // with a throwaway table name: getting a structured "does not exist"
-      // response back proves the URL + anon key reach Supabase correctly.
+      // with a throwaway table name. Any structured response back — even a
+      // "table not found" (42P01 / PGRST205) — proves the URL + anon key reached
+      // Supabase. Only a thrown error (network) or a rejected key = not connected.
       const { error } = await supabase.from('__healthcheck__').select('*').limit(1)
-      if (!error || error.code === '42P01' || /does not exist/i.test(error.message)) {
+      const authRejected =
+        error != null &&
+        (error.code === 'PGRST301' ||
+          /api key|jwt|unauthor|invalid.*key/i.test(error.message))
+      if (authRejected) {
+        message = 'Reached Supabase, but the anon key was rejected — double-check the key.'
+      } else {
         ok = true
         message = 'Reached Supabase — URL and anon key are wired correctly.'
-      } else {
-        message = `Supabase responded with an unexpected error: ${error.message}`
       }
     } catch (e) {
       message = `Could not reach Supabase: ${e instanceof Error ? e.message : String(e)}`
