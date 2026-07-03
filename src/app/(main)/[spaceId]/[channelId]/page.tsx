@@ -23,7 +23,7 @@ export default async function ChannelPage({ params }: { params: Promise<{ spaceI
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', fontFamily: 'system-ui, sans-serif' }}>
-      <div style={{ padding: '14px 20px', borderBottom: '1px solid #eee', fontWeight: 700 }}>{channel.name}</div>
+      <div style={{ padding: '14px 20px', borderBottom: '1px solid #262626', fontWeight: 700, color: '#fff' }}>{channel.name}</div>
       <div
         style={{
           flex: 1,
@@ -35,8 +35,8 @@ export default async function ChannelPage({ params }: { params: Promise<{ spaceI
           color: '#999',
         }}
       >
-        <div style={{ fontSize: 18, color: '#555' }}>{p.label}</div>
-        <div style={{ fontSize: 14 }}>{p.note}</div>
+        <div style={{ fontSize: 18, color: '#ddd' }}>{p.label}</div>
+        <div style={{ fontSize: 14, color: '#888' }}>{p.note}</div>
       </div>
     </div>
   )

@@ -12,7 +12,7 @@ export default function Home() {
         fontFamily: 'system-ui, sans-serif',
       }}
     >
-      <div style={{ fontSize: 18, color: '#555' }}>Welcome 👋</div>
+      <div style={{ fontSize: 18, color: '#ccc' }}>Welcome 👋</div>
       <div style={{ fontSize: 14 }}>Pick a space on the left, or hit + to create one.</div>
     </div>
   )

@@ -44,7 +44,7 @@ export default async function HealthPage() {
       >
         {ok ? '✓ Connected' : '✗ Not connected'}
       </span>
-      <p style={{ color: '#555', marginTop: '1rem', lineHeight: 1.5 }}>{message}</p>
+      <p style={{ color: '#aaa', marginTop: '1rem', lineHeight: 1.5 }}>{message}</p>
     </main>
   )
 }
