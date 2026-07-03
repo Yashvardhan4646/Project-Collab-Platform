@@ -1,0 +1,275 @@
+/* eslint-disable @next/next/no-img-element */
+"use client";
+
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import type { RealtimeChannel } from "@supabase/supabase-js";
+import { createClient } from "@/lib/supabase/client";
+
+type Author = { display_name: string | null; avatar_url: string | null };
+type Reaction = { emoji: string; user_id: string };
+type Msg = {
+  id: string;
+  content: string;
+  image_url: string | null;
+  created_at: string;
+  author_id: string;
+  author: Author | null;
+  reactions: Reaction[];
+};
+
+const EMOJIS = ["👍", "❤️", "😂", "🎉", "🔥"];
+const SELECT = "id, content, image_url, created_at, author_id, author:profiles(display_name, avatar_url), reactions(emoji, user_id)";
+
+function timeOf(iso: string) {
+  try {
+    return new Date(iso).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true });
+  } catch {
+    return "";
+  }
+}
+
+export function Chat({ channelId, channelName, me, meName }: { channelId: string; channelName: string; me: string; meName: string }) {
+  const supabase = useMemo(() => createClient(), []);
+  const [messages, setMessages] = useState<Msg[]>([]);
+  const [text, setText] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [sending, setSending] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const [here, setHere] = useState(1);
+  const [typers, setTypers] = useState<string[]>([]);
+
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const chRef = useRef<RealtimeChannel | null>(null);
+  const cache = useRef<Map<string, Author>>(new Map());
+  const lastTyping = useRef(0);
+
+  function scrollDown(smooth = false) {
+    requestAnimationFrame(() => {
+      const el = scrollRef.current;
+      if (el) el.scrollTo({ top: el.scrollHeight, behavior: smooth ? "smooth" : "auto" });
+    });
+  }
+
+  useEffect(() => {
+    let active = true;
+    setMessages([]);
+    (async () => {
+      const { data } = await supabase
+        .from("messages")
+        .select(SELECT)
+        .eq("channel_id", channelId)
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (!active) return;
+      const rows = ((data ?? []) as unknown as Msg[]).slice().reverse();
+      rows.forEach((r) => r.author && cache.current.set(r.author_id, r.author));
+      setMessages(rows);
+      setHasMore((data?.length ?? 0) === 50);
+      scrollDown();
+    })();
+    return () => {
+      active = false;
+    };
+  }, [channelId, supabase]);
+
+  useEffect(() => {
+    const ch = supabase.channel(`chat:${channelId}`, { config: { presence: { key: me } } });
+    chRef.current = ch;
+
+    ch.on("postgres_changes", { event: "INSERT", schema: "public", table: "messages", filter: `channel_id=eq.${channelId}` }, async (payload) => {
+      const row = payload.new as { id: string; content: string; image_url: string | null; created_at: string; author_id: string };
+      let author = cache.current.get(row.author_id) ?? null;
+      if (!author) {
+        const { data } = await supabase.from("profiles").select("display_name, avatar_url").eq("id", row.author_id).single();
+        author = data ?? { display_name: "Someone", avatar_url: null };
+        cache.current.set(row.author_id, author);
+      }
+      setMessages((prev) => (prev.some((m) => m.id === row.id) ? prev : [...prev, { ...row, author, reactions: [] }]));
+      scrollDown(true);
+    });
+
+    ch.on("postgres_changes", { event: "INSERT", schema: "public", table: "reactions" }, (payload) => {
+      const r = payload.new as Reaction & { message_id: string };
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === r.message_id && !m.reactions.some((x) => x.user_id === r.user_id && x.emoji === r.emoji)
+            ? { ...m, reactions: [...m.reactions, { emoji: r.emoji, user_id: r.user_id }] }
+            : m,
+        ),
+      );
+    });
+
+    ch.on("postgres_changes", { event: "DELETE", schema: "public", table: "reactions" }, (payload) => {
+      const r = payload.old as Reaction & { message_id: string };
+      setMessages((prev) =>
+        prev.map((m) => (m.id === r.message_id ? { ...m, reactions: m.reactions.filter((x) => !(x.user_id === r.user_id && x.emoji === r.emoji)) } : m)),
+      );
+    });
+
+    ch.on("presence", { event: "sync" }, () => setHere(Object.keys(ch.presenceState()).length || 1));
+
+    ch.on("broadcast", { event: "typing" }, ({ payload }) => {
+      const n = String(payload?.name || "");
+      if (!n || payload?.userId === me) return;
+      setTypers((prev) => (prev.includes(n) ? prev : [...prev, n]));
+      window.setTimeout(() => setTypers((prev) => prev.filter((x) => x !== n)), 3000);
+    });
+
+    ch.subscribe((status) => {
+      if (status === "SUBSCRIBED") ch.track({ at: Date.now() });
+    });
+
+    return () => {
+      supabase.removeChannel(ch);
+      chRef.current = null;
+    };
+  }, [channelId, me, supabase]);
+
+  async function loadOlder() {
+    if (loadingOlder || messages.length === 0) return;
+    setLoadingOlder(true);
+    const el = scrollRef.current;
+    const prevH = el?.scrollHeight ?? 0;
+    const { data } = await supabase
+      .from("messages")
+      .select(SELECT)
+      .eq("channel_id", channelId)
+      .lt("created_at", messages[0].created_at)
+      .order("created_at", { ascending: false })
+      .limit(50);
+    const older = ((data ?? []) as unknown as Msg[]).slice().reverse();
+    older.forEach((r) => r.author && cache.current.set(r.author_id, r.author));
+    setMessages((prev) => [...older, ...prev]);
+    setHasMore((data?.length ?? 0) === 50);
+    setLoadingOlder(false);
+    requestAnimationFrame(() => {
+      if (el) el.scrollTop = el.scrollHeight - prevH;
+    });
+  }
+
+  function onType(v: string) {
+    setText(v);
+    const now = Date.now();
+    if (now - lastTyping.current > 1500) {
+      lastTyping.current = now;
+      chRef.current?.send({ type: "broadcast", event: "typing", payload: { userId: me, name: meName } });
+    }
+  }
+
+  async function send(e: FormEvent) {
+    e.preventDefault();
+    const content = text.trim();
+    if ((!content && !file) || sending) return;
+    setSending(true);
+    let image_url: string | null = null;
+    if (file) {
+      const path = `${channelId}/${Date.now()}-${file.name}`;
+      const { error: upErr } = await supabase.storage.from("chat-images").upload(path, file);
+      if (upErr) {
+        alert(`Image upload failed: ${upErr.message}`);
+        setSending(false);
+        return;
+      }
+      image_url = supabase.storage.from("chat-images").getPublicUrl(path).data.publicUrl;
+    }
+    const { error } = await supabase.from("messages").insert({ channel_id: channelId, author_id: me, content, image_url });
+    setSending(false);
+    if (error) {
+      alert(error.message);
+      return;
+    }
+    setText("");
+    setFile(null);
+  }
+
+  async function toggleReaction(m: Msg, emoji: string) {
+    const mine = m.reactions.some((r) => r.user_id === me && r.emoji === emoji);
+    if (mine) await supabase.from("reactions").delete().eq("message_id", m.id).eq("user_id", me).eq("emoji", emoji);
+    else await supabase.from("reactions").insert({ message_id: m.id, user_id: me, emoji });
+  }
+
+  function grouped(reactions: Reaction[]) {
+    const map = new Map<string, { count: number; mine: boolean }>();
+    for (const r of reactions) {
+      const g = map.get(r.emoji) ?? { count: 0, mine: false };
+      g.count++;
+      if (r.user_id === me) g.mine = true;
+      map.set(r.emoji, g);
+    }
+    return [...map.entries()];
+  }
+
+  return (
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", height: "100%", minWidth: 0, fontFamily: "system-ui, sans-serif" }}>
+      <div style={{ padding: "12px 20px", borderBottom: "1px solid #262626", display: "flex", alignItems: "baseline", gap: 12 }}>
+        <span style={{ fontWeight: 700, color: "#fff" }}># {channelName}</span>
+        <span style={{ fontSize: 12, color: "#777" }}>{here} here</span>
+      </div>
+
+      <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: "12px 20px" }}>
+        {hasMore && (
+          <button onClick={loadOlder} disabled={loadingOlder} style={{ display: "block", margin: "0 auto 12px", background: "none", border: "1px solid #333", color: "#aaa", borderRadius: 6, padding: "4px 12px", cursor: "pointer", fontSize: 12 }}>
+            {loadingOlder ? "loading…" : "load older"}
+          </button>
+        )}
+        {messages.length === 0 && <div style={{ color: "#666", textAlign: "center", marginTop: 40 }}>No messages yet. Say hi 👋</div>}
+        {messages.map((m) => (
+          <div key={m.id} style={{ display: "flex", gap: 10, padding: "6px 0", alignItems: "flex-start" }}>
+            {m.author?.avatar_url ? (
+              <img src={m.author.avatar_url} alt="" style={{ width: 34, height: 34, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+            ) : (
+              <div style={{ width: 34, height: 34, borderRadius: "50%", background: "#333", color: "#ccc", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, flexShrink: 0 }}>
+                {(m.author?.display_name ?? "?").trim().slice(0, 2).toUpperCase() || "?"}
+              </div>
+            )}
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
+                <b style={{ color: "#fff", fontSize: 14 }}>{m.author?.display_name ?? "Someone"}</b>
+                <span style={{ color: "#666", fontSize: 11 }}>{timeOf(m.created_at)}</span>
+              </div>
+              {m.content && <div style={{ color: "#ddd", fontSize: 14, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{m.content}</div>}
+              {m.image_url && <img src={m.image_url} alt="" style={{ maxWidth: 320, maxHeight: 320, borderRadius: 8, marginTop: 4, display: "block" }} />}
+              <div style={{ display: "flex", gap: 4, marginTop: 4, flexWrap: "wrap", alignItems: "center" }}>
+                {grouped(m.reactions).map(([emoji, g]) => (
+                  <button key={emoji} onClick={() => toggleReaction(m, emoji)} style={{ border: `1px solid ${g.mine ? "#4f46e5" : "#333"}`, background: g.mine ? "#232338" : "#181818", color: "#ddd", borderRadius: 999, padding: "1px 7px", fontSize: 12, cursor: "pointer" }}>
+                    {emoji} {g.count}
+                  </button>
+                ))}
+                {EMOJIS.map((e) => (
+                  <button key={e} onClick={() => toggleReaction(m, e)} title={`react ${e}`} style={{ border: "none", background: "none", cursor: "pointer", opacity: 0.35, fontSize: 13 }}>
+                    {e}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ minHeight: 18, padding: "0 20px", color: "#777", fontSize: 12 }}>
+        {typers.length > 0 && `${typers.join(", ")} ${typers.length === 1 ? "is" : "are"} typing…`}
+      </div>
+
+      {file && (
+        <div style={{ padding: "0 20px 6px", color: "#888", fontSize: 12 }}>
+          📎 {file.name}{" "}
+          <button onClick={() => setFile(null)} style={{ background: "none", border: "none", color: "#f87171", cursor: "pointer" }}>
+            ×
+          </button>
+        </div>
+      )}
+
+      <form onSubmit={send} style={{ display: "flex", gap: 8, padding: "12px 20px", borderTop: "1px solid #262626", alignItems: "center" }}>
+        <input value={text} onChange={(e) => onType(e.target.value)} placeholder={`Message #${channelName}`} style={{ flex: 1, background: "#141414", border: "1px solid #333", borderRadius: 8, padding: "9px 12px", color: "#ededed", fontSize: 14 }} />
+        <label style={{ color: "#888", cursor: "pointer", fontSize: 20 }} title="attach image">
+          📎
+          <input type="file" accept="image/*" onChange={(e) => setFile(e.target.files?.[0] ?? null)} style={{ display: "none" }} />
+        </label>
+        <button type="submit" disabled={sending} style={{ background: "#4f46e5", color: "#fff", border: "none", borderRadius: 8, padding: "9px 16px", cursor: "pointer", fontSize: 14 }}>
+          {sending ? "…" : "Send"}
+        </button>
+      </form>
+    </div>
+  );
+}
