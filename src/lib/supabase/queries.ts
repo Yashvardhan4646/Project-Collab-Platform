@@ -28,3 +28,14 @@ export const getSpaceChannels = cache(async (spaceId: string) => {
     .order("position");
   return data ?? [];
 });
+
+export const getMyRole = cache(async (spaceId: string, userId: string) => {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("space_members")
+    .select("role")
+    .eq("space_id", spaceId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  return data?.role ?? null;
+});
