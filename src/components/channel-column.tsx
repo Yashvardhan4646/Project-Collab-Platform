@@ -30,8 +30,11 @@ export function ChannelColumn({
 
   return (
     <aside style={{ width: 220, background: '#191919', color: '#ddd', height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ padding: '14px 16px', borderBottom: '1px solid #262626', fontWeight: 700, fontSize: 14, color: '#fff' }}>
-        {spaceName}
+      <div style={{ padding: '12px 16px', borderBottom: '1px solid #262626', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{ fontWeight: 700, fontSize: 14, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{spaceName}</span>
+        <Link href={`/${spaceId}/members`} title="Members &amp; invites" style={{ color: '#888', textDecoration: 'none', fontSize: 12, flexShrink: 0, marginLeft: 8 }}>
+          members
+        </Link>
       </div>
       <div style={{ flex: 1, overflowY: 'auto', padding: 8 }}>
         {channels.length === 0 && <div style={{ color: '#666', fontSize: 13, padding: 8 }}>No channels yet</div>}
