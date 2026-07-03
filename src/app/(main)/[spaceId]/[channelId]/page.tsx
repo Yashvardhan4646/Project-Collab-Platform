@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentUser, getProfile } from "@/lib/supabase/queries";
 import { Chat } from "@/components/chat";
 import { Whiteboard } from "@/components/whiteboard";
 
@@ -16,14 +17,14 @@ export default async function ChannelPage({ params }: { params: Promise<{ spaceI
   const { channelId } = await params;
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const { data: channel } = await supabase.from("channels").select("id, name, type").eq("id", channelId).single();
+  const [user, { data: channel }] = await Promise.all([
+    getCurrentUser(), // cache hit: already resolved in the main layout this request
+    supabase.from("channels").select("id, name, type").eq("id", channelId).single(),
+  ]);
   if (!channel) notFound();
 
   if ((channel.type === "text" || channel.type === "whiteboard") && user) {
-    const { data: profile } = await supabase.from("profiles").select("display_name").eq("id", user.id).single();
+    const profile = await getProfile(user.id); // cache hit: shared with the main layout
     const meName = profile?.display_name ?? "You";
     if (channel.type === "whiteboard") {
       return <Whiteboard channelId={channel.id} channelName={channel.name} me={user.id} meName={meName} />;

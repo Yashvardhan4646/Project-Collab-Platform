@@ -22,3 +22,18 @@ body {
 body {
   font-family: var(--font-geist-sans), system-ui, sans-serif;
 }
+
+/* loading skeletons */
+.skel {
+  background: linear-gradient(90deg, #151515 25%, #212121 37%, #151515 63%);
+  background-size: 400% 100%;
+  animation: skel-shimmer 1.4s ease infinite;
+  border-radius: 6px;
+}
+@keyframes skel-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: 0 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skel { animation: none; }
+}

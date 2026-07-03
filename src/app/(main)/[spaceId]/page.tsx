@@ -1,18 +1,12 @@
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+import { getSpaceChannels } from '@/lib/supabase/queries'
 
 export default async function SpacePage({ params }: { params: Promise<{ spaceId: string }> }) {
   const { spaceId } = await params
-  const supabase = await createClient()
 
-  const { data: channels } = await supabase
-    .from('channels')
-    .select('id')
-    .eq('space_id', spaceId)
-    .order('position')
-    .limit(1)
-
-  if (channels && channels.length > 0) {
+  // Cached: the space layout already fetched this in the same request.
+  const channels = await getSpaceChannels(spaceId)
+  if (channels.length > 0) {
     redirect(`/${spaceId}/${channels[0].id}`)
   }
 
