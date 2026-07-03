@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 
@@ -18,7 +18,6 @@ type Msg = {
 };
 
 const EMOJIS = ["👍", "❤️", "😂", "🎉", "🔥"];
-const SELECT = "id, content, image_url, created_at, author_id, author:profiles(display_name, avatar_url), reactions(emoji, user_id)";
 
 function timeOf(iso: string) {
   try {
@@ -51,27 +50,53 @@ export function Chat({ channelId, channelName, me, meName }: { channelId: string
     });
   }
 
+  // Plain, robust batch fetch — no PostgREST embeds. Resolves authors + reactions separately.
+  const fetchBatch = useCallback(
+    async (beforeIso?: string): Promise<Msg[]> => {
+      let q = supabase.from("messages").select("id, content, image_url, created_at, author_id").eq("channel_id", channelId);
+      if (beforeIso) q = q.lt("created_at", beforeIso);
+      const { data: msgs, error } = await q.order("created_at", { ascending: false }).limit(50);
+      if (error) {
+        console.error("[chat] messages fetch failed", error.message);
+        return [];
+      }
+      const rows = ((msgs ?? []) as { id: string; content: string; image_url: string | null; created_at: string; author_id: string }[]).slice().reverse();
+      if (rows.length === 0) return [];
+
+      const needAuthors = [...new Set(rows.map((r) => r.author_id))].filter((id) => !cache.current.has(id));
+      if (needAuthors.length) {
+        const { data: profs } = await supabase.from("profiles").select("id, display_name, avatar_url").in("id", needAuthors);
+        (profs ?? []).forEach((p) => cache.current.set(p.id, { display_name: p.display_name, avatar_url: p.avatar_url }));
+      }
+
+      const ids = rows.map((r) => r.id);
+      const byMsg = new Map<string, Reaction[]>();
+      const { data: reacts } = await supabase.from("reactions").select("message_id, emoji, user_id").in("message_id", ids);
+      (reacts ?? []).forEach((r) => {
+        const arr = byMsg.get(r.message_id) ?? [];
+        arr.push({ emoji: r.emoji, user_id: r.user_id });
+        byMsg.set(r.message_id, arr);
+      });
+
+      return rows.map((r) => ({ ...r, author: cache.current.get(r.author_id) ?? null, reactions: byMsg.get(r.id) ?? [] }));
+    },
+    [channelId, supabase],
+  );
+
   useEffect(() => {
     let active = true;
     setMessages([]);
     (async () => {
-      const { data } = await supabase
-        .from("messages")
-        .select(SELECT)
-        .eq("channel_id", channelId)
-        .order("created_at", { ascending: false })
-        .limit(50);
+      const batch = await fetchBatch();
       if (!active) return;
-      const rows = ((data ?? []) as unknown as Msg[]).slice().reverse();
-      rows.forEach((r) => r.author && cache.current.set(r.author_id, r.author));
-      setMessages(rows);
-      setHasMore((data?.length ?? 0) === 50);
+      setMessages(batch);
+      setHasMore(batch.length === 50);
       scrollDown();
     })();
     return () => {
       active = false;
     };
-  }, [channelId, supabase]);
+  }, [fetchBatch]);
 
   useEffect(() => {
     const ch = supabase.channel(`chat:${channelId}`, { config: { presence: { key: me } } });
@@ -131,17 +156,9 @@ export function Chat({ channelId, channelName, me, meName }: { channelId: string
     setLoadingOlder(true);
     const el = scrollRef.current;
     const prevH = el?.scrollHeight ?? 0;
-    const { data } = await supabase
-      .from("messages")
-      .select(SELECT)
-      .eq("channel_id", channelId)
-      .lt("created_at", messages[0].created_at)
-      .order("created_at", { ascending: false })
-      .limit(50);
-    const older = ((data ?? []) as unknown as Msg[]).slice().reverse();
-    older.forEach((r) => r.author && cache.current.set(r.author_id, r.author));
+    const older = await fetchBatch(messages[0].created_at);
     setMessages((prev) => [...older, ...prev]);
-    setHasMore((data?.length ?? 0) === 50);
+    setHasMore(older.length === 50);
     setLoadingOlder(false);
     requestAnimationFrame(() => {
       if (el) el.scrollTop = el.scrollHeight - prevH;

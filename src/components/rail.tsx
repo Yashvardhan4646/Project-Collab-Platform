@@ -33,7 +33,8 @@ export function Rail({
     if (!name || !name.trim()) return
     setBusy(true)
     try {
-      await createServer(name.trim())
+      const id = await createServer(name.trim())
+      window.location.href = `/${id}`
     } catch (e) {
       alert(e instanceof Error ? e.message : 'Could not create server')
       setBusy(false)
