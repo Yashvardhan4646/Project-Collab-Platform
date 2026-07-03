@@ -30,9 +30,13 @@ export async function updateSession(request: NextRequest) {
   const path = request.nextUrl.pathname
   const code = request.nextUrl.searchParams.get('code')
 
-  if (code && !user && !path.startsWith('/auth')) {
+  if (code && !path.startsWith('/auth')) {
     const url = request.nextUrl.clone()
-    url.pathname = '/auth/callback'
+    if (user) {
+      url.searchParams.delete('code')
+    } else {
+      url.pathname = '/auth/callback'
+    }
     return NextResponse.redirect(url)
   }
 
