@@ -7,6 +7,7 @@ import { signOut } from '@/app/auth/actions'
 import { createServer } from '@/app/(main)/actions'
 
 type Space = { id: string; type: string; name: string | null }
+type Dm = { id: string; type: string; name: string | null; avatar: string | null; unread: number; lastAt: string | null }
 type Profile = { display_name: string | null; avatar_url: string | null }
 
 function initials(name: string | null) {
@@ -45,7 +46,7 @@ export function Rail({
   profile,
 }: {
   servers: Space[]
-  dms: Space[]
+  dms: Dm[]
   privateSpace: Space | null
   profile: Profile
 }) {
@@ -57,6 +58,7 @@ export function Rail({
 
   // A DM is "active" when the user is currently inside one of the dm spaces.
   const inDm = dms.some((d) => d.id === activeSpaceId)
+  const totalUnread = dms.reduce((n, d) => n + (d.unread || 0), 0)
 
   async function onCreate() {
     const name = window.prompt('New server name')
@@ -129,11 +131,13 @@ export function Rail({
             style={railItem(dmOpen || inDm, { position: 'relative', color: dmOpen || inDm ? '#fff' : '#cfcfcf' })}
           >
             <DmGlyph />
-            {dms.length > 0 && (
+            {totalUnread > 0 && (
               <span
                 aria-hidden
-                style={{ position: 'absolute', top: 8, right: 8, width: 9, height: 9, borderRadius: '50%', background: '#22c55e', border: '2px solid #0f0f0f' }}
-              />
+                style={{ position: 'absolute', top: 6, right: 4, minWidth: 16, height: 16, padding: '0 4px', borderRadius: 8, background: '#ef4444', color: '#fff', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #0f0f0f' }}
+              >
+                {totalUnread > 99 ? '99+' : totalUnread}
+              </span>
             )}
           </button>
 
@@ -225,6 +229,7 @@ export function Rail({
               {dms.length === 0 && <div style={{ color: '#666', fontSize: 13, padding: '20px 12px', textAlign: 'center' }}>No conversations yet.</div>}
               {dms.map((d) => {
                 const active = d.id === activeSpaceId
+                const label = d.name ?? 'Direct message'
                 return (
                   <button
                     key={d.id}
@@ -243,24 +248,34 @@ export function Rail({
                       textAlign: 'left',
                     }}
                   >
-                    <span
-                      style={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: '50%',
-                        background: '#333',
-                        color: '#ccc',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: 13,
-                        fontWeight: 600,
-                        flexShrink: 0,
-                      }}
-                    >
-                      {initials(d.name ?? 'DM')}
-                    </span>
-                    <span style={{ fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name ?? 'Direct message'}</span>
+                    {d.avatar ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={d.avatar} alt="" style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                    ) : (
+                      <span
+                        style={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: '50%',
+                          background: '#333',
+                          color: '#ccc',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: 13,
+                          fontWeight: 600,
+                          flexShrink: 0,
+                        }}
+                      >
+                        {initials(label)}
+                      </span>
+                    )}
+                    <span style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: d.unread > 0 ? 700 : 500, color: d.unread > 0 ? '#fff' : '#ededed', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
+                    {d.unread > 0 && (
+                      <span style={{ minWidth: 18, height: 18, padding: '0 5px', borderRadius: 9, background: '#4f46e5', color: '#fff', fontSize: 11, fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        {d.unread > 99 ? '99+' : d.unread}
+                      </span>
+                    )}
                   </button>
                 )
               })}

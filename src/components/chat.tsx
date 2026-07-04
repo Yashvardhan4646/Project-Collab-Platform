@@ -85,6 +85,16 @@ export function Chat({ channelId, channelName, me, meName }: { channelId: string
     };
   }, [fetchBatch]);
 
+  // Mark this channel read whenever we open it. Ignored gracefully if the
+  // mark_channel_read RPC isn't deployed yet (unread just won't clear).
+  const markRead = useCallback(() => {
+    void supabase.rpc("mark_channel_read", { p_channel_id: channelId });
+  }, [channelId, supabase]);
+
+  useEffect(() => {
+    markRead();
+  }, [markRead]);
+
   useEffect(() => {
     const ch = supabase.channel(`chat:${channelId}`, { config: { presence: { key: me } } });
     chRef.current = ch;
@@ -99,6 +109,7 @@ export function Chat({ channelId, channelName, me, meName }: { channelId: string
       }
       setMessages((prev) => (prev.some((m) => m.id === row.id) ? prev : [...prev, { ...row, author }]));
       scrollDown(true);
+      if (row.author_id !== me) markRead(); // we're looking at it, so keep it read
     });
 
     ch.on("presence", { event: "sync" }, () => setHere(Object.keys(ch.presenceState()).length || 1));
@@ -118,7 +129,7 @@ export function Chat({ channelId, channelName, me, meName }: { channelId: string
       supabase.removeChannel(ch);
       chRef.current = null;
     };
-  }, [channelId, me, supabase]);
+  }, [channelId, me, supabase, markRead]);
 
   async function loadOlder() {
     if (loadingOlder || messages.length === 0) return;
