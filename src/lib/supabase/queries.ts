@@ -19,6 +19,12 @@ export const getProfile = cache(async (userId: string) => {
   return data;
 });
 
+export const getSpace = cache(async (spaceId: string) => {
+  const supabase = await createClient();
+  const { data } = await supabase.from("spaces").select("id, name, type").eq("id", spaceId).single();
+  return data;
+});
+
 export const getSpaceChannels = cache(async (spaceId: string) => {
   const supabase = await createClient();
   const { data } = await supabase

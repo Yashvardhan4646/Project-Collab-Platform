@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentUser, getProfile, getMyRole } from "@/lib/supabase/queries";
+import { getCurrentUser, getProfile, getMyRole, getSpace, getDmPeers } from "@/lib/supabase/queries";
 import { Chat } from "@/components/chat";
 import { Whiteboard } from "@/components/whiteboard";
 import { TaskBoard } from "@/components/task-board";
@@ -31,6 +31,12 @@ export default async function ChannelPage({ params }: { params: Promise<{ spaceI
     }
     if (channel.type === "todo") {
       return <TaskBoard spaceId={spaceId} channelId={channel.id} channelName={channel.name} me={user.id} />;
+    }
+    // In a DM, title the chat with the other person (no "#") rather than "# direct".
+    const space = await getSpace(spaceId); // cache hit: shared with the space layout
+    if (space?.type === "dm") {
+      const peers = await getDmPeers([spaceId], user.id);
+      return <Chat channelId={channel.id} channelName={peers.get(spaceId)?.name ?? "Direct message"} me={user.id} meName={meName} dm />;
     }
     return <Chat channelId={channel.id} channelName={channel.name} me={user.id} meName={meName} />;
   }

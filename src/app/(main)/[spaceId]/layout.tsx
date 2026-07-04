@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react'
 import { notFound } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
-import { getCurrentUser, getMyRole, getSpaceChannels, getDmPeers } from '@/lib/supabase/queries'
+import { getCurrentUser, getMyRole, getSpace, getSpaceChannels, getDmPeers } from '@/lib/supabase/queries'
 import { ChannelColumn } from '@/components/channel-column'
 
 export default async function SpaceLayout({
@@ -12,11 +11,10 @@ export default async function SpaceLayout({
   params: Promise<{ spaceId: string }>
 }) {
   const { spaceId } = await params
-  const supabase = await createClient()
   const user = await getCurrentUser() // cache hit: resolved in the main layout
 
-  const [{ data: space }, channels, role] = await Promise.all([
-    supabase.from('spaces').select('id, name, type').eq('id', spaceId).single(),
+  const [space, channels, role] = await Promise.all([
+    getSpace(spaceId),
     getSpaceChannels(spaceId),
     user ? getMyRole(spaceId, user.id) : Promise.resolve(null),
   ])

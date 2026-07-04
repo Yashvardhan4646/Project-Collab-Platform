@@ -99,6 +99,14 @@ export function Rail({
     }
   }, [supabase, me, refreshUnread])
 
+  // Opening a channel marks it read (in <Chat>); re-pull unread shortly after so
+  // its dot/badge clears. Without this the layout never re-runs on client nav, so
+  // a dot would linger until the next incoming message or a full reload.
+  useEffect(() => {
+    const t = setTimeout(refreshUnread, 1000)
+    return () => clearTimeout(t)
+  }, [pathname, refreshUnread])
+
   async function onCreate() {
     const name = window.prompt('New server name')
     if (!name || !name.trim()) return

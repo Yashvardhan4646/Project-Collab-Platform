@@ -23,7 +23,7 @@ function timeOf(iso: string) {
   }
 }
 
-export function Chat({ channelId, channelName, me, meName }: { channelId: string; channelName: string; me: string; meName: string }) {
+export function Chat({ channelId, channelName, me, meName, dm = false }: { channelId: string; channelName: string; me: string; meName: string; dm?: boolean }) {
   const supabase = useMemo(() => createClient(), []);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [text, setText] = useState("");
@@ -183,7 +183,7 @@ export function Chat({ channelId, channelName, me, meName }: { channelId: string
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", height: "100%", minWidth: 0, fontFamily: "system-ui, sans-serif" }}>
       <div style={{ padding: "12px 20px", borderBottom: "1px solid #262626", display: "flex", alignItems: "baseline", gap: 12 }}>
-        <span style={{ fontWeight: 700, color: "#fff" }}># {channelName}</span>
+        <span style={{ fontWeight: 700, color: "#fff" }}>{dm ? channelName : `# ${channelName}`}</span>
         <span style={{ fontSize: 12, color: "#777" }}>{here} here</span>
       </div>
 
