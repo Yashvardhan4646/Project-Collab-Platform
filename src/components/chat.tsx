@@ -6,7 +6,6 @@ import type { RealtimeChannel } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 
 type Author = { display_name: string | null; avatar_url: string | null };
-type Reaction = { emoji: string; user_id: string };
 type Msg = {
   id: string;
   content: string;
@@ -14,10 +13,7 @@ type Msg = {
   created_at: string;
   author_id: string;
   author: Author | null;
-  reactions: Reaction[];
 };
-
-const EMOJIS = ["👍", "❤️", "😂", "🎉", "🔥"];
 
 function timeOf(iso: string) {
   try {
@@ -69,16 +65,7 @@ export function Chat({ channelId, channelName, me, meName }: { channelId: string
         (profs ?? []).forEach((p) => cache.current.set(p.id, { display_name: p.display_name, avatar_url: p.avatar_url }));
       }
 
-      const ids = rows.map((r) => r.id);
-      const byMsg = new Map<string, Reaction[]>();
-      const { data: reacts } = await supabase.from("reactions").select("message_id, emoji, user_id").in("message_id", ids);
-      (reacts ?? []).forEach((r) => {
-        const arr = byMsg.get(r.message_id) ?? [];
-        arr.push({ emoji: r.emoji, user_id: r.user_id });
-        byMsg.set(r.message_id, arr);
-      });
-
-      return rows.map((r) => ({ ...r, author: cache.current.get(r.author_id) ?? null, reactions: byMsg.get(r.id) ?? [] }));
+      return rows.map((r) => ({ ...r, author: cache.current.get(r.author_id) ?? null }));
     },
     [channelId, supabase],
   );
@@ -110,26 +97,8 @@ export function Chat({ channelId, channelName, me, meName }: { channelId: string
         author = data ?? { display_name: "Someone", avatar_url: null };
         cache.current.set(row.author_id, author);
       }
-      setMessages((prev) => (prev.some((m) => m.id === row.id) ? prev : [...prev, { ...row, author, reactions: [] }]));
+      setMessages((prev) => (prev.some((m) => m.id === row.id) ? prev : [...prev, { ...row, author }]));
       scrollDown(true);
-    });
-
-    ch.on("postgres_changes", { event: "INSERT", schema: "public", table: "reactions" }, (payload) => {
-      const r = payload.new as Reaction & { message_id: string };
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === r.message_id && !m.reactions.some((x) => x.user_id === r.user_id && x.emoji === r.emoji)
-            ? { ...m, reactions: [...m.reactions, { emoji: r.emoji, user_id: r.user_id }] }
-            : m,
-        ),
-      );
-    });
-
-    ch.on("postgres_changes", { event: "DELETE", schema: "public", table: "reactions" }, (payload) => {
-      const r = payload.old as Reaction & { message_id: string };
-      setMessages((prev) =>
-        prev.map((m) => (m.id === r.message_id ? { ...m, reactions: m.reactions.filter((x) => !(x.user_id === r.user_id && x.emoji === r.emoji)) } : m)),
-      );
     });
 
     ch.on("presence", { event: "sync" }, () => setHere(Object.keys(ch.presenceState()).length || 1));
@@ -200,23 +169,6 @@ export function Chat({ channelId, channelName, me, meName }: { channelId: string
     setFile(null);
   }
 
-  async function toggleReaction(m: Msg, emoji: string) {
-    const mine = m.reactions.some((r) => r.user_id === me && r.emoji === emoji);
-    if (mine) await supabase.from("reactions").delete().eq("message_id", m.id).eq("user_id", me).eq("emoji", emoji);
-    else await supabase.from("reactions").insert({ message_id: m.id, user_id: me, emoji });
-  }
-
-  function grouped(reactions: Reaction[]) {
-    const map = new Map<string, { count: number; mine: boolean }>();
-    for (const r of reactions) {
-      const g = map.get(r.emoji) ?? { count: 0, mine: false };
-      g.count++;
-      if (r.user_id === me) g.mine = true;
-      map.set(r.emoji, g);
-    }
-    return [...map.entries()];
-  }
-
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", height: "100%", minWidth: 0, fontFamily: "system-ui, sans-serif" }}>
       <div style={{ padding: "12px 20px", borderBottom: "1px solid #262626", display: "flex", alignItems: "baseline", gap: 12 }}>
@@ -247,18 +199,6 @@ export function Chat({ channelId, channelName, me, meName }: { channelId: string
               </div>
               {m.content && <div style={{ color: "#ddd", fontSize: 14, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{m.content}</div>}
               {m.image_url && <img src={m.image_url} alt="" style={{ maxWidth: 320, maxHeight: 320, borderRadius: 8, marginTop: 4, display: "block" }} />}
-              <div style={{ display: "flex", gap: 4, marginTop: 4, flexWrap: "wrap", alignItems: "center" }}>
-                {grouped(m.reactions).map(([emoji, g]) => (
-                  <button key={emoji} onClick={() => toggleReaction(m, emoji)} style={{ border: `1px solid ${g.mine ? "#4f46e5" : "#333"}`, background: g.mine ? "#232338" : "#181818", color: "#ddd", borderRadius: 999, padding: "1px 7px", fontSize: 12, cursor: "pointer" }}>
-                    {emoji} {g.count}
-                  </button>
-                ))}
-                {EMOJIS.map((e) => (
-                  <button key={e} onClick={() => toggleReaction(m, e)} title={`react ${e}`} style={{ border: "none", background: "none", cursor: "pointer", opacity: 0.35, fontSize: 13 }}>
-                    {e}
-                  </button>
-                ))}
-              </div>
             </div>
           </div>
         ))}
