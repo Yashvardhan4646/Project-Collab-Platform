@@ -23,11 +23,13 @@ export function ChannelColumn({
   spaceId,
   channels,
   canInvite,
+  isServer,
 }: {
   spaceName: string
   spaceId: string
   channels: Channel[]
   canInvite: boolean
+  isServer: boolean
 }) {
   const pathname = usePathname()
   const activeChannelId = pathname.split('/')[2]
@@ -76,9 +78,11 @@ export function ChannelColumn({
               invite
             </button>
           )}
-          <Link href={`/${spaceId}/members`} title="Members" style={{ color: '#888', textDecoration: 'none', fontSize: 12 }}>
-            members
-          </Link>
+          {isServer && (
+            <Link href={`/${spaceId}/members`} title="Members" style={{ color: '#888', textDecoration: 'none', fontSize: 12 }}>
+              members
+            </Link>
+          )}
         </div>
       </div>
 
