@@ -54,6 +54,8 @@ export function Whiteboard({ channelId, channelName, me, meName }: { channelId: 
   const lastScene = useRef(0);
   const lastPointer = useRef(0);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestElements = useRef<readonly El[]>([]);
+  const sceneTrail = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Load the persisted scene once, then mount the canvas with it.
   useEffect(() => {
@@ -110,6 +112,14 @@ export function Whiteboard({ channelId, channelName, me, meName }: { channelId: 
     };
   }, [channelId, me, meName, supabase]);
 
+  // Flush the persist + trailing-scene timers when leaving the board.
+  useEffect(() => {
+    return () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      if (sceneTrail.current) clearTimeout(sceneTrail.current);
+    };
+  }, []);
+
   function persist(elements: readonly El[]) {
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
@@ -122,12 +132,22 @@ export function Whiteboard({ channelId, channelName, me, meName }: { channelId: 
     }, 800);
   }
 
+  function broadcastScene(elements: readonly El[]) {
+    lastScene.current = Date.now();
+    chRef.current?.send({ type: "broadcast", event: "scene", payload: { elements } });
+  }
+
   function onChange(elements: readonly El[]) {
     if (applyingRemote.current) return; // don't echo a remote update back out
+    latestElements.current = elements;
     const now = Date.now();
     if (now - lastScene.current > 90) {
-      lastScene.current = now;
-      chRef.current?.send({ type: "broadcast", event: "scene", payload: { elements } });
+      broadcastScene(elements);
+    } else {
+      // Throttled out — schedule a trailing send so the final frame of a stroke
+      // always reaches other viewers instead of being dropped until they reload.
+      if (sceneTrail.current) clearTimeout(sceneTrail.current);
+      sceneTrail.current = setTimeout(() => broadcastScene(latestElements.current), 120);
     }
     persist(elements);
   }
