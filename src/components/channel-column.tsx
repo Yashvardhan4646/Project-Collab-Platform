@@ -56,6 +56,18 @@ export function ChannelColumn({
   const [newName, setNewName] = useState('')
   const [newType, setNewType] = useState('text')
   const [creating, setCreating] = useState(false)
+  const [hovered, setHovered] = useState<string | null>(null)
+
+  async function deleteChannel(id: string, name: string) {
+    if (!window.confirm(`Delete #${name}? This removes its messages and content.`)) return
+    const { error } = await supabase.from('channels').delete().eq('id', id)
+    if (error) {
+      alert(error.message)
+      return
+    }
+    if (id === activeChannelId) router.push(`/${spaceId}`)
+    router.refresh()
+  }
 
   async function createChannel() {
     const name = newName.trim()
@@ -148,26 +160,47 @@ export function ChannelColumn({
         {channels.length === 0 && <div style={{ color: '#666', fontSize: 13, padding: 8 }}>No channels yet</div>}
         {channels.map((c) => {
           const active = c.id === activeChannelId
+          const canDelete = canInvite && c.type !== 'cubicle'
           return (
-            <Link
+            <div
               key={c.id}
-              href={`/${spaceId}/${c.id}`}
+              onMouseEnter={() => setHovered(c.id)}
+              onMouseLeave={() => setHovered((h) => (h === c.id ? null : h))}
               style={{
                 display: 'flex',
-                gap: 8,
                 alignItems: 'center',
-                padding: '6px 10px',
                 borderRadius: 6,
-                textDecoration: 'none',
-                color: active ? '#fff' : '#a3a3a3',
                 background: active ? '#2f2f3a' : 'transparent',
-                fontSize: 14,
                 marginBottom: 2,
               }}
             >
-              <span style={{ opacity: 0.7, width: 16, textAlign: 'center' }}>{typeIcon[c.type] ?? '#'}</span>
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
-            </Link>
+              <Link
+                href={`/${spaceId}/${c.id}`}
+                style={{
+                  display: 'flex',
+                  gap: 8,
+                  alignItems: 'center',
+                  flex: 1,
+                  minWidth: 0,
+                  padding: '6px 10px',
+                  textDecoration: 'none',
+                  color: active ? '#fff' : '#a3a3a3',
+                  fontSize: 14,
+                }}
+              >
+                <span style={{ opacity: 0.7, width: 16, textAlign: 'center' }}>{typeIcon[c.type] ?? '#'}</span>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
+              </Link>
+              {canDelete && hovered === c.id && (
+                <button
+                  onClick={() => deleteChannel(c.id, c.name)}
+                  title={`Delete #${c.name}`}
+                  style={{ background: 'none', border: 'none', color: '#777', cursor: 'pointer', fontSize: 14, padding: '0 8px', flexShrink: 0 }}
+                >
+                  ×
+                </button>
+              )}
+            </div>
           )
         })}
 
