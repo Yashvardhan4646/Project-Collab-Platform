@@ -66,6 +66,11 @@ export default function LoginPage() {
       </button>
 
       {msg && <p style={{ color: '#f87171', fontSize: '0.85rem', marginTop: '1rem' }}>{msg}</p>}
+
+      <p style={{ color: '#666', fontSize: '0.8rem', marginTop: '2rem', lineHeight: 1.6, textAlign: 'center' }}>
+        Collab Platform is a shared workspace for a small team. Chat, direct messages, task boards, notes,
+        reminders, a whiteboard, and voice and video calls, all in one place.
+      </p>
     </main>
   )
 }

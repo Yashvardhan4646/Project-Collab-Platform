@@ -12,24 +12,70 @@ const geistMono = Geist_Mono({
   subsets: ['latin'],
 })
 
+const siteUrl = 'https://collabproject-vasu.vercel.app'
 const title = 'Collab Platform'
 const description = 'One place for a small team to chat, track tasks, keep notes, and share files.'
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://collabproject-vasu.vercel.app'),
-  title,
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: 'Collab Platform — chat, tasks, and notes for a small team',
+    template: '%s · Collab Platform',
+  },
   description,
+  applicationName: title,
+  keywords: [
+    'team chat',
+    'task management',
+    'small team collaboration',
+    'shared workspace',
+    'team notes',
+    'whiteboard',
+    'direct messages',
+    'reminders',
+  ],
+  category: 'productivity',
+  alternates: { canonical: '/' },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true, 'max-image-preview': 'large', 'max-snippet': -1 },
+  },
   openGraph: {
     title,
     description,
     siteName: title,
+    url: siteUrl,
     type: 'website',
+    locale: 'en_US',
   },
   twitter: {
     card: 'summary_large_image',
     title,
     description,
   },
+}
+
+// Structured data so search + answer engines can state plainly what this is.
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'WebApplication',
+  name: 'Collab Platform',
+  url: siteUrl,
+  applicationCategory: 'BusinessApplication',
+  operatingSystem: 'Web',
+  description,
+  offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+  featureList: [
+    'Team chat channels',
+    'Direct messages',
+    'Task boards',
+    'Shared notes',
+    'Reminders',
+    'Collaborative whiteboard',
+    'Voice and video calls',
+    'Embedded documents',
+  ],
 }
 
 export default function RootLayout({
@@ -39,6 +85,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
+      <head>
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      </head>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   )

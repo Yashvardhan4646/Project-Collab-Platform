@@ -1,0 +1,35 @@
+# Collab Platform
+
+> A shared workspace for a small team. It puts chat, direct messages, task boards, notes, reminders, a whiteboard, embedded documents, and voice and video calls in one place, so a small group can run a project without juggling five separate tools.
+
+Collab Platform is a web app. It is account-based: you sign in, then work inside servers (teams) made of channels, alongside direct messages with other people.
+
+## What you can do
+
+- Chat in text channels, with live typing indicators, presence, image uploads, and message editing and deletion.
+- Send direct messages to anyone by their @username, even if you do not share a team yet.
+- Run a task board (to do, in progress, done) with assignees and due dates. Tasks assigned to you show up on your desk under "Waiting on you".
+- Keep shared notes that save as you type and sync live to everyone in the space.
+- Track reminders with due times.
+- Draw together on a live multiplayer whiteboard.
+- Embed a Google Doc, Sheet, or Slides file into a channel.
+- Start a peer-to-peer voice or video call in a voice channel.
+- Keep a private cubicle: a personal space only you can see.
+
+## How it is organized
+
+- **Desk**: your home view. Shows what is waiting on you, your teams, and your direct messages.
+- **Servers (teams)**: contain channels. Owners and admins add or remove channels and invite people with a link.
+- **Channels**: each has a type (text, voice/video, whiteboard, tasks, notes, reminders, docs, or cubicle).
+- **Direct messages**: one-to-one conversations, reachable from the message icon on the left rail.
+- **Profile**: set a unique @username, a display name, an avatar, and a short status line.
+
+## Technical notes
+
+- Built with Next.js and React on the front end.
+- Supabase handles auth, the Postgres database, row-level security, storage, and realtime.
+- Voice and video use browser WebRTC in a peer-to-peer mesh, signalled over Supabase Realtime. No separate media server.
+
+## Access
+
+Using Collab Platform requires an account. Sign in with Google or with an email and password at /login.
