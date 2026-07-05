@@ -107,7 +107,7 @@ export function ProfileSettings({ userId, initial }: { userId: string; initial: 
           </label>
 
           <label style={{ display: "block" }}>
-            <span style={{ display: "block", fontSize: 13, color: "#888", marginBottom: 6 }}>Status — what you&apos;re working on</span>
+            <span style={{ display: "block", fontSize: 13, color: "#888", marginBottom: 6 }}>What you&apos;re working on</span>
             <input value={status} onChange={(e) => setStatus(e.target.value)} placeholder="e.g. shipping the desk v2" maxLength={120} style={field} />
           </label>
 

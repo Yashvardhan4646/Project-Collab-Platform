@@ -3,9 +3,12 @@
 import { useEffect, useState, type CSSProperties, type FormEvent } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
+const USERNAME_RE = /^[a-z0-9_]{3,20}$/
+
 export default function OnboardingPage() {
   const supabase = createClient()
   const [userId, setUserId] = useState<string | null>(null)
+  const [username, setUsername] = useState('')
   const [name, setName] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [busy, setBusy] = useState(false)
@@ -24,6 +27,10 @@ export default function OnboardingPage() {
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
     if (!userId) return
+    if (!USERNAME_RE.test(username)) {
+      setMsg('Username must be 3 to 20 characters: lowercase letters, numbers, underscore.')
+      return
+    }
     if (!name.trim()) {
       setMsg('Please enter a display name.')
       return
@@ -45,11 +52,12 @@ export default function OnboardingPage() {
 
     const { error } = await supabase
       .from('profiles')
-      .update({ display_name: name.trim(), ...(avatar_url ? { avatar_url } : {}) })
+      .update({ username, display_name: name.trim(), ...(avatar_url ? { avatar_url } : {}) })
       .eq('id', userId)
     setBusy(false)
     if (error) {
-      setMsg(error.message)
+      const taken = error.code === '23505' || /duplicate|unique/i.test(error.message)
+      setMsg(taken ? 'That username is taken. Try another.' : error.message)
       return
     }
     window.location.href = '/'
@@ -58,9 +66,23 @@ export default function OnboardingPage() {
   return (
     <main style={wrap}>
       <h1 style={{ fontSize: '1.5rem', margin: 0, color: '#fff' }}>One quick thing</h1>
-      <p style={{ color: '#888', marginTop: '0.25rem', marginBottom: '1.5rem' }}>Set your display name.</p>
+      <p style={{ color: '#888', marginTop: '0.25rem', marginBottom: '1.5rem' }}>Pick a username and a display name.</p>
 
       <form onSubmit={onSubmit}>
+        <label style={label}>Username</label>
+        <div style={{ display: 'flex', alignItems: 'center', background: '#141414', border: '1px solid #333', borderRadius: 8, paddingLeft: '0.7rem', marginBottom: '1rem' }}>
+          <span style={{ color: '#666', fontSize: '0.95rem' }}>@</span>
+          <input
+            required
+            placeholder="arsh"
+            value={username}
+            onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+            maxLength={20}
+            style={{ ...input, background: 'transparent', border: 'none', paddingLeft: '0.3rem', marginBottom: 0 }}
+          />
+        </div>
+        <p style={{ color: '#666', fontSize: '0.75rem', marginTop: '-0.6rem', marginBottom: '1rem' }}>Lowercase letters, numbers, underscore. People find you by this.</p>
+
         <label style={label}>Display name</label>
         <input required placeholder="e.g. Arsh" value={name} onChange={(e) => setName(e.target.value)} style={input} />
 
