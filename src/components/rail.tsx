@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { signOut } from '@/app/auth/actions'
-import { createServer } from '@/app/(main)/actions'
+import { createServer, startDm } from '@/app/(main)/actions'
 import { createClient } from '@/lib/supabase/client'
 
 type Space = { id: string; type: string; name: string | null }
@@ -61,6 +61,46 @@ export function Rail({
   const activeSpaceId = pathname.split('/')[1]
   const [busy, setBusy] = useState(false)
   const [dmOpen, setDmOpen] = useState(false)
+
+  // "New message" picker: people you share a space with, so you can start a DM
+  // straight from the panel instead of hunting through a server's member list.
+  const [picking, setPicking] = useState(false)
+  const [people, setPeople] = useState<{ id: string; name: string; avatar: string | null }[] | null>(null)
+  const [pickQuery, setPickQuery] = useState('')
+  const [startingDm, setStartingDm] = useState(false)
+
+  const loadPeople = useCallback(async () => {
+    const { data: rows } = await supabase.from('space_members').select('user_id').neq('user_id', me)
+    const ids = [...new Set((rows ?? []).map((r) => r.user_id as string))]
+    if (ids.length === 0) {
+      setPeople([])
+      return
+    }
+    const { data: profs } = await supabase.from('profiles').select('id, display_name, avatar_url').in('id', ids)
+    setPeople((profs ?? []).map((p) => ({ id: p.id, name: p.display_name ?? 'Member', avatar: p.avatar_url })).sort((a, b) => a.name.localeCompare(b.name)))
+  }, [supabase, me])
+
+  function openPicker() {
+    setPicking(true)
+    setPickQuery('')
+    if (!people) loadPeople()
+  }
+
+  async function beginDm(userId: string) {
+    if (startingDm) return
+    setStartingDm(true)
+    try {
+      const id = await startDm(userId)
+      setDmOpen(false)
+      setPicking(false)
+      router.push(`/${id}`)
+      router.refresh()
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Could not start DM')
+    } finally {
+      setStartingDm(false)
+    }
+  }
 
   // One unread-per-space map covers both server dots and DM badges. Held in state
   // so it can update live (below) without re-rendering the whole app; re-synced
@@ -178,7 +218,7 @@ export function Rail({
 
           {/* Direct messages — one button for all of them, opens the DM panel. */}
           <button
-            onClick={() => setDmOpen((o) => !o)}
+            onClick={() => { setDmOpen((o) => !o); setPicking(false) }}
             title="Direct messages"
             style={railItem(dmOpen || inDm, { position: 'relative', color: dmOpen || inDm ? '#fff' : '#cfcfcf' })}
           >
@@ -257,7 +297,7 @@ export function Rail({
       {/* DM panel — slides in beside the rail, WhatsApp/Discord-style list of chats. */}
       {dmOpen && (
         <>
-          <div onClick={() => setDmOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
+          <div onClick={() => { setDmOpen(false); setPicking(false) }} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
           <div
             style={{
               position: 'fixed',
@@ -274,12 +314,51 @@ export function Rail({
             }}
           >
             <div style={{ padding: '16px 18px 12px', borderBottom: '1px solid #262626', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ color: '#fff', fontWeight: 700, fontSize: 15 }}>Direct messages</span>
-              <button onClick={() => setDmOpen(false)} title="Close" style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>
-                ×
+              <span style={{ color: '#fff', fontWeight: 700, fontSize: 15 }}>{picking ? 'New message' : 'Direct messages'}</span>
+              <button onClick={() => (picking ? setPicking(false) : setDmOpen(false))} title="Close" style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>
+                {picking ? '‹' : '×'}
               </button>
             </div>
+
+            {picking ? (
+              <div style={{ flex: 1, overflowY: 'auto', padding: 8, display: 'flex', flexDirection: 'column' }}>
+                <input
+                  autoFocus
+                  value={pickQuery}
+                  onChange={(e) => setPickQuery(e.target.value)}
+                  placeholder="Search people…"
+                  style={{ background: '#0f0f0f', border: '1px solid #333', borderRadius: 8, padding: '8px 10px', color: '#ededed', fontSize: 13, margin: '4px 4px 8px' }}
+                />
+                {people === null && <div style={{ color: '#666', fontSize: 13, padding: '12px', textAlign: 'center' }}>loading…</div>}
+                {people?.length === 0 && <div style={{ color: '#666', fontSize: 13, padding: '12px', textAlign: 'center' }}>No one to message yet. Join or create a team first.</div>}
+                {people
+                  ?.filter((p) => p.name.toLowerCase().includes(pickQuery.trim().toLowerCase()))
+                  .map((p) => (
+                    <button
+                      key={p.id}
+                      onClick={() => beginDm(p.id)}
+                      disabled={startingDm}
+                      style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '8px 10px', borderRadius: 8, border: 'none', background: 'transparent', color: '#ededed', cursor: 'pointer', textAlign: 'left' }}
+                    >
+                      {p.avatar ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={p.avatar} alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                      ) : (
+                        <span style={{ width: 32, height: 32, borderRadius: '50%', background: '#333', color: '#ccc', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 600, flexShrink: 0 }}>{initials(p.name)}</span>
+                      )}
+                      <span style={{ fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</span>
+                    </button>
+                  ))}
+              </div>
+            ) : (
             <div style={{ flex: 1, overflowY: 'auto', padding: 8 }}>
+              <button
+                onClick={openPicker}
+                style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '9px 10px', borderRadius: 8, border: 'none', background: 'transparent', color: '#6ee7b7', cursor: 'pointer', fontSize: 14, marginBottom: 4 }}
+              >
+                <span style={{ width: 32, height: 32, borderRadius: '50%', background: '#1c2b22', color: '#6ee7b7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>+</span>
+                New message
+              </button>
               {dms.length === 0 && <div style={{ color: '#666', fontSize: 13, padding: '20px 12px', textAlign: 'center' }}>No conversations yet.</div>}
               {dms.map((d) => {
                 const active = d.id === activeSpaceId
@@ -335,6 +414,7 @@ export function Rail({
                 )
               })}
             </div>
+            )}
           </div>
         </>
       )}
