@@ -19,7 +19,7 @@ const description = 'One place for a small team to chat, track tasks, keep notes
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: 'Collab Platform — chat, tasks, and notes for a small team',
+    default: 'Collab Platform, a shared workspace for small teams',
     template: '%s · Collab Platform',
   },
   description,

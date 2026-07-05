@@ -28,7 +28,7 @@ export default function LoginPage() {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       setBusy(false)
       if (error) return setMsg(error.message)
-      window.location.href = '/'
+      window.location.href = '/desk'
     } else {
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -37,7 +37,7 @@ export default function LoginPage() {
       })
       setBusy(false)
       if (error) return setMsg(error.message)
-      if (data.session) window.location.href = '/'
+      if (data.session) window.location.href = '/desk'
       else setMsg('Account created. Check your email to confirm, then sign in.')
     }
   }

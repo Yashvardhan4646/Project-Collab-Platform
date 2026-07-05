@@ -239,7 +239,7 @@ export function Rail({
       >
         <div style={{ flex: 1, overflowY: 'auto', width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           {/* Desk — the home of the workspace. */}
-          <Link href="/" title="Desk" style={railItem(pathname === '/')}>
+          <Link href="/desk" title="Desk" style={railItem(pathname === '/desk')}>
             <DeskGlyph />
           </Link>
 

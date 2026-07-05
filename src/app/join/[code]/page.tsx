@@ -48,7 +48,7 @@ export default function JoinPage() {
         <>
           <h1 style={{ fontSize: "1.4rem", color: "#fff" }}>Can&apos;t join</h1>
           <p style={{ color: "#f87171" }}>{error}</p>
-          <a href="/" style={{ color: "#818cf8" }}>Back home</a>
+          <a href="/desk" style={{ color: "#818cf8" }}>Back home</a>
         </>
       ) : (
         <p style={{ color: "#888" }}>Joining…</p>

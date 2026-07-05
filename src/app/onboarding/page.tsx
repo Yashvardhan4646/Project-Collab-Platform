@@ -60,7 +60,7 @@ export default function OnboardingPage() {
       setMsg(taken ? 'That username is taken. Try another.' : error.message)
       return
     }
-    window.location.href = '/'
+    window.location.href = '/desk'
   }
 
   return (
