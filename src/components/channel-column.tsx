@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
@@ -18,6 +18,17 @@ const typeIcon: Record<string, string> = {
   cubicle: '◻',
 }
 
+// Channel types a user can add to a server (cubicle is auto-managed; private/dm aren't servers).
+const CREATABLE: { type: string; label: string }[] = [
+  { type: 'text', label: 'Text' },
+  { type: 'voice_video', label: 'Voice / Video' },
+  { type: 'whiteboard', label: 'Whiteboard' },
+  { type: 'todo', label: 'Tasks' },
+  { type: 'notes', label: 'Notes' },
+  { type: 'reminders', label: 'Reminders' },
+  { type: 'docs_sheet', label: 'Shared Docs' },
+]
+
 export function ChannelColumn({
   spaceName,
   spaceId,
@@ -32,6 +43,7 @@ export function ChannelColumn({
   isServer: boolean
 }) {
   const pathname = usePathname()
+  const router = useRouter()
   const activeChannelId = pathname.split('/')[2]
   const supabase = useMemo(() => createClient(), [])
 
@@ -39,6 +51,31 @@ export function ChannelColumn({
   const [link, setLink] = useState('')
   const [busy, setBusy] = useState(false)
   const [copied, setCopied] = useState(false)
+
+  const [adding, setAdding] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [newType, setNewType] = useState('text')
+  const [creating, setCreating] = useState(false)
+
+  async function createChannel() {
+    const name = newName.trim()
+    if (!name || creating) return
+    setCreating(true)
+    const { data, error } = await supabase
+      .from('channels')
+      .insert({ space_id: spaceId, type: newType, name, position: channels.length })
+      .select('id')
+      .single()
+    setCreating(false)
+    if (error) {
+      alert(error.message)
+      return
+    }
+    setNewName('')
+    setAdding(false)
+    router.push(`/${spaceId}/${data.id}`)
+    router.refresh() // pull the new channel into the server-rendered list
+  }
 
   async function toggleInvite() {
     const next = !open
@@ -133,6 +170,43 @@ export function ChannelColumn({
             </Link>
           )
         })}
+
+        {canInvite && (
+          <div style={{ marginTop: 6 }}>
+            {adding ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '8px 6px', background: '#151515', borderRadius: 8 }}>
+                <input
+                  autoFocus
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && createChannel()}
+                  placeholder="channel name"
+                  style={{ background: '#0f0f0f', border: '1px solid #333', borderRadius: 6, padding: '6px 8px', color: '#ededed', fontSize: 13 }}
+                />
+                <select value={newType} onChange={(e) => setNewType(e.target.value)} style={{ background: '#0f0f0f', border: '1px solid #333', borderRadius: 6, padding: '6px 8px', color: '#ededed', fontSize: 13 }}>
+                  {CREATABLE.map((t) => (
+                    <option key={t.type} value={t.type}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button onClick={createChannel} disabled={creating || !newName.trim()} style={{ flex: 1, background: '#4f46e5', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 8px', cursor: 'pointer', fontSize: 13, opacity: creating || !newName.trim() ? 0.6 : 1 }}>
+                    {creating ? '…' : 'Create'}
+                  </button>
+                  <button onClick={() => { setAdding(false); setNewName('') }} style={{ background: 'none', border: '1px solid #333', color: '#aaa', borderRadius: 6, padding: '6px 10px', cursor: 'pointer', fontSize: 13 }}>
+                    ×
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button onClick={() => setAdding(true)} style={{ display: 'flex', gap: 8, alignItems: 'center', width: '100%', padding: '6px 10px', borderRadius: 6, border: 'none', background: 'transparent', color: '#6ee7b7', fontSize: 14, cursor: 'pointer' }}>
+                <span style={{ width: 16, textAlign: 'center' }}>+</span>
+                <span>Add channel</span>
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </aside>
   )
