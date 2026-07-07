@@ -21,15 +21,18 @@ export function ContextMenu({ x, y, items, onClose }: { x: number; y: number; it
   useEffect(() => {
     const close = () => onClose()
     const key = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
-    window.addEventListener('pointerdown', close)
-    window.addEventListener('contextmenu', close)
-    window.addEventListener('keydown', key)
-    window.addEventListener('blur', close)
+    // Attach on the next tick so the right-click that opened this menu doesn't
+    // immediately close it, and a right-click on another item can re-open cleanly.
+    const t = setTimeout(() => {
+      window.addEventListener('pointerdown', close)
+      window.addEventListener('keydown', key)
+      window.addEventListener('scroll', close, true)
+    }, 0)
     return () => {
+      clearTimeout(t)
       window.removeEventListener('pointerdown', close)
-      window.removeEventListener('contextmenu', close)
       window.removeEventListener('keydown', key)
-      window.removeEventListener('blur', close)
+      window.removeEventListener('scroll', close, true)
     }
   }, [onClose])
 
