@@ -40,3 +40,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local DB working file, delivered out of band
+supabase/migrations/_collab_updates.sql
