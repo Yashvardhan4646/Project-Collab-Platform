@@ -32,7 +32,7 @@ export default async function SpaceLayout({
     )
   }
 
-  const spaceName = space.name ?? (space.type === 'private' ? 'Private' : 'Server')
+  const spaceName = space.type === 'private' ? 'Your space' : (space.name ?? 'Server')
   // invite + member management only make sense in a server.
   const canInvite = space.type === 'server' && (role === 'owner' || role === 'admin')
   // channel add/delete: server admins, or you in your own private space.
