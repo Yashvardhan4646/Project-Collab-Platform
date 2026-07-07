@@ -12,10 +12,9 @@ const H = 520
 const NAMES = ['Ash', 'Ravi', 'Mira', 'Kai', 'Noor', 'Sol', 'Dev', 'Iris', 'Juno', 'Rey']
 const COLORS = ['#0E5C46', '#B23A26', '#8a5e12', '#185FA5', '#534AB7']
 
-const DEMO: Live[] = [
-  { id: 'd1', x: 168, y: 150, name: 'Julian', color: '#8a5e12' },
-  { id: 'd2', x: 356, y: 78, name: 'Aria', color: '#B23A26' },
-  { id: 'd3', x: 322, y: 300, name: 'Vasu', color: '#0E5C46' },
+const DEMO: { live: Live; drift: string }[] = [
+  { live: { id: 'd1', x: 168, y: 150, name: 'Julian', color: '#8a5e12' }, drift: 'lb-drift-a 7s ease-in-out infinite' },
+  { live: { id: 'd2', x: 322, y: 300, name: 'Vasu', color: '#0E5C46' }, drift: 'lb-drift-c 8s ease-in-out infinite' },
 ]
 
 function Pointer({ live, drift }: { live: Live; drift?: string }) {
@@ -96,7 +95,6 @@ export function LoginBoard() {
   }, [supabase])
 
   const live = Object.values(remotes)
-  const showDemo = live.length === 0
 
   return (
     <div ref={boardRef} style={{ position: 'relative', width: W, height: H }}>
@@ -162,9 +160,8 @@ export function LoginBoard() {
         </div>
       </div>
 
-      {showDemo
-        ? DEMO.map((d, i) => <Pointer key={d.id} live={d} drift={`lb-drift-${['a', 'b', 'c'][i]} ${[7, 6, 8][i]}s ease-in-out infinite`} />)
-        : live.map((r) => <Pointer key={r.id} live={r} />)}
+      {DEMO.map((d) => <Pointer key={d.live.id} live={d.live} drift={d.drift} />)}
+      {live.slice(0, 2).map((r) => <Pointer key={r.id} live={r} />)}
     </div>
   )
 }
