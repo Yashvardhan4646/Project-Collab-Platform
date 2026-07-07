@@ -11,10 +11,11 @@ type Collaborator = { username?: string; pointer?: { x: number; y: number }; col
 type ExcalidrawApi = {
   updateScene: (scene: { elements?: readonly El[]; collaborators?: Map<string, Collaborator> }) => void;
   getSceneElements: () => readonly El[];
+  getAppState?: () => { scrollX: number; scrollY: number; width: number; height: number; zoom: { value: number } };
 };
 type ExcalidrawProps = {
   excalidrawAPI?: (api: ExcalidrawApi) => void;
-  initialData?: { elements?: readonly El[]; scrollToContent?: boolean } | null;
+  initialData?: { elements?: readonly El[]; scrollToContent?: boolean; appState?: Record<string, unknown> } | null;
   onChange?: (elements: readonly El[]) => void;
   onPointerUpdate?: (p: { pointer: { x: number; y: number } }) => void;
   isCollaborating?: boolean;
@@ -177,11 +178,50 @@ export function Whiteboard({ channelId, channelName, me, meName }: { channelId: 
     chRef.current?.send({ type: "broadcast", event: "pointer", payload: { userId: me, name: meName, x: p.pointer.x, y: p.pointer.y } });
   }
 
+  async function addSticky() {
+    const api = apiRef.current;
+    if (!api) return;
+    const { convertToExcalidrawElements } = await import("@excalidraw/excalidraw");
+    let cx = 240, cy = 200;
+    const app = api.getAppState?.();
+    if (app) {
+      const z = app.zoom?.value || 1;
+      cx = app.width / 2 / z - app.scrollX - 95;
+      cy = app.height / 2 / z - app.scrollY - 95;
+    }
+    const created = convertToExcalidrawElements([
+      {
+        type: "rectangle",
+        x: cx,
+        y: cy,
+        width: 190,
+        height: 190,
+        backgroundColor: "#f4edd6",
+        strokeColor: "#e4d9b0",
+        fillStyle: "solid",
+        roundness: { type: 3 },
+        label: { text: "New note", fontSize: 20, strokeColor: "#3a3324" },
+      },
+    ]) as unknown as El[];
+    const next = [...api.getSceneElements(), ...created];
+    api.updateScene({ elements: next });
+    latestElements.current = next;
+    broadcastScene(next);
+    persist(next);
+  }
+
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", height: "100%", minWidth: 0, background: "var(--background)", fontFamily: "var(--font-sans)", transition: "background-color 0.15s ease" }}>
-      <div style={{ padding: "12px 20px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "baseline", gap: 12 }}>
+      <div style={{ padding: "12px 20px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 12 }}>
         <span style={{ fontWeight: 700, color: "var(--foreground)" }}>&#128393; {channelName}</span>
         <span style={{ fontSize: 12, color: "var(--muted)" }}>{here} here &middot; live</span>
+        <button
+          onClick={addSticky}
+          title="Add a sticky note"
+          style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 6, background: "#f4edd6", color: "#3a3324", border: "1px solid #e4d9b0", borderRadius: 8, padding: "5px 12px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-sans)" }}
+        >
+          + Sticky note
+        </button>
       </div>
       <div style={{ flex: 1, minHeight: 0 }}>
         {ready && (
@@ -189,7 +229,7 @@ export function Whiteboard({ channelId, channelName, me, meName }: { channelId: 
             excalidrawAPI={(api) => {
               apiRef.current = api;
             }}
-            initialData={{ elements: initialElements.current, scrollToContent: true }}
+            initialData={{ elements: initialElements.current, scrollToContent: true, appState: { currentItemStrokeColor: "#0E5C46", currentItemBackgroundColor: "transparent" } }}
             onChange={onChange}
             onPointerUpdate={onPointerUpdate}
             isCollaborating
