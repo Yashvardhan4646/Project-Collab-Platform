@@ -257,7 +257,7 @@ grant execute on function public.create_server_with_template(text) to authentica
 
 -- Backfill: give every existing server any feature channel it doesn't have yet.
 insert into public.channels (space_id, type, name, position)
-select s.id, v.type, v.name, v.position
+select s.id, v.type::public.channel_type, v.name, v.position
 from public.spaces s
 cross join (values
   ('whiteboard',  'Whiteboard', 20),
@@ -268,7 +268,7 @@ cross join (values
 ) as v(type, name, position)
 where s.type = 'server'
   and not exists (
-    select 1 from public.channels c where c.space_id = s.id and c.type = v.type
+    select 1 from public.channels c where c.space_id = s.id and c.type = v.type::public.channel_type
   );
 
 -- ####################################################################
@@ -304,7 +304,7 @@ $$;
 
 -- Backfill: give every existing Private space the personal channels it lacks.
 insert into public.channels (space_id, type, name, position)
-select s.id, v.type, v.name, v.position
+select s.id, v.type::public.channel_type, v.name, v.position
 from public.spaces s
 cross join (values
   ('notes',     'Notes',     0),
@@ -313,5 +313,5 @@ cross join (values
 ) as v(type, name, position)
 where s.type = 'private'
   and not exists (
-    select 1 from public.channels c where c.space_id = s.id and c.type = v.type
+    select 1 from public.channels c where c.space_id = s.id and c.type = v.type::public.channel_type
   );
